@@ -2,46 +2,45 @@ import os
 import pandas as pd
 
 class DataProcessing:
-    def __init__(self, file_path: str, expected_columns: list):
+    def __init__(self, file_path: str):
         self.file_path = file_path
-        self.expected_columns = expected_columns
 
-    def check_file_existence(self):# проверяем есть ли такой файл 
+    def check_file_existence(self):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Ошибка: Файл '{self.file_path}' не найден.")
 
-    def load_data(self):# загружаем датафрейм и проверяем нужного ли он формата
+    def load_data(self):
         try:
             df = pd.read_csv(self.file_path)
             return df
-        except Exception as e:
+        except pd.errors.EmptyDataError:  #  если файл пуст
+            raise ValueError("Ошибка: Файл пуст")
+        except Exception:
             raise IOError(f"Ошибка загрузки файла '{self.file_path}'")
-        
-    def validate_structure(self, df):# проверяем структуру датафреймя и пустой ли он
-        if df.empty:
-            raise ValueError("Ошибка: Загруженный датасет пуст.")
 
-        missing_columns = [col for col in self.expected_columns if col not in df.columns]
-        if missing_columns:
-            raise ValueError(f"Ошибка: В файле отсутствуют ожидаемые столбцы: {missing_columns}")
+    def validate_data_types(self, df):
+        for col in df.columns:
+            actual_type = df[col].dtype
+
+            # Определяем ожидаемый тип (числовой или строковый)
+            if pd.api.types.is_numeric_dtype(df[col]):
+                expected_type = "numeric"
+            else:
+                expected_type = "string"
+
+            # Проверяем соответствует ли фактический тип ожидаемому
+            if expected_type == "numeric" and not pd.api.types.is_numeric_dtype(df[col]):
+                raise TypeError(f"Ошибка: Ожидался числовой тип для '{col}', но получен {actual_type}")
+            elif expected_type == "string" and not pd.api.types.is_string_dtype(df[col]):
+                raise TypeError(f"Ошибка: Ожидался строковый тип для '{col}', но получен {actual_type}")
 
     def process(self):
         try:
             self.check_file_existence()
             df = self.load_data()
-            self.validate_structure(df)
-            print("Чтение датафрейма завершено успешно")
-        except FileNotFoundError as e:
-            print(e)
-        except IOError as e:
-            print(e)
-        except ValueError as e:
-            print(e)
-        except Exception as e:
-            print(f"Непредвиденная ошибка: {str(e)}")
+            self.validate_data_types(df)
+            print(" Чтение и проверка датафрейма завершены успешно.")
+        except (FileNotFoundError, IOError, ValueError, TypeError) as e:
+            print(f" {e}")
 
 
-file_path = "Проверка на формат.docx"
-expected_columns = ["Тип операции", "Сумма операции", "Вид расчета"]
-processor = DataProcessing(file_path, expected_columns)
-processor.process()
